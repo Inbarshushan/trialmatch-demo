@@ -4,7 +4,7 @@ import fitz  # PyMuPDF
 from openai import OpenAI
 
 # Load logo
-st.image("trialmatch_logo.png", width=150)
+st.image("A_logo_for_a_company_named_TrialMatch_is_displayed.png", width=150)
 
 # Title
 st.title("TrialMatch - בדיקת התאמה למחקר קליני")
