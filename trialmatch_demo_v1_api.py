@@ -32,3 +32,69 @@ if protocol_file and medical_files:
         
         פרוטוקול:
         {protocol_text[:10000]}
+        """
+
+        extracted_criteria = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": extraction_prompt}]
+        ).choices[0].message.content
+
+        # Step 2: Read all medical PDFs
+        all_medical_text = ""
+        for file in medical_files:
+            reader = PdfReader(file)
+            all_medical_text += "\n".join([page.extract_text() for page in reader.pages])
+
+        # Step 3: Smart matching with example
+        matching_prompt = f"""
+להלן דוגמה לתשובה מסודרת:
+
+אבחנה:
+דרוש: סרטן שד מוקדם (Early Breast Cancer), חיובי לקולטנים הורמונליים, שלילי ל-HER2.
+המטופלת: חיובית לקולטנים הורמונליים (ER חיובי), שלילית ל-HER2.
+מתאים.
+
+שלב מחלה:
+דרוש: שלב I-III בסיכון בינוני או גבוה (כפי שמוגדר בטבלה 4 בפרוטוקול).
+המטופלת: שלב מוקדם, ללא עדות למחלה גרורתית.
+חסר מידע מפורש על דירוג הסיכון.
+
+טיפול נוכחי:
+דרוש: טיפול אנדוקריני מסוג טמוקסיפן או אחת מהתרופות אנאסטרוזול, לפטרוזול או אקסמסטן.
+המטופלת: נוטלת אנאסטרוזול.
+מתאים.
+
+---
+
+כעת נתח את המידע הבא:
+
+קריטריוני מחקר:
+{extracted_criteria}
+
+מידע רפואי של המטופל:
+{all_medical_text[:6000]}
+
+אנא נתח האם המטופלת מתאימה להשתתף במחקר הקליני, תוך שימוש בשפה מקצועית, רפואית, בהירה וזורמת – כפי שמוסבר לרופא עמית. אל תשתמש בסמלים כמו ✔️ או ❌. פרט אילו קריטריוני הכללה ואי-הכללה מתקיימים ואילו לא, תוך הסבר קצר לכל אחד. ציין גם אם חסר מידע חשוב.
+במידה ולא נמצאו קריטריוני אי-הכללה רלוונטיים – כתוב זאת במפורש.
+
+- תרגם את כל המונחים באנגלית לעברית רפואית תקנית וברורה.
+- הימנע משילוב של מילים באנגלית באמצע משפטים בעברית.
+- השתמש במבנה פסקאות מסודר וברור.
+
+בסיום, נסח פסקת מסקנה ברורה: האם ניתן להסיק התאמה למחקר, ואם לא – מה נדרש כדי לקבל החלטה.
+"""
+
+        # Get response from OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": matching_prompt}]
+        ).choices[0].message.content
+
+        # Wrap response in RTL direction formatting
+        RTL = "\u202B"
+        POP = "\u202C"
+        wrapped_response = f"{RTL}{response}{POP}"
+
+        # Show result
+        st.subheader("🧠 תוצאת ההתאמה:")
+        st.markdown(wrapped_response)
