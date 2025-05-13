@@ -1,52 +1,34 @@
 
 import streamlit as st
-import fitz  # PyMuPDF
+from PyPDF2 import PdfReader
 from openai import OpenAI
 
-# Load logo
-st.image("A_logo_for_a_company_named_TrialMatch_is_displayed.png", width=150)
+# Load API key
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Title
-st.title("TrialMatch - בדיקת התאמה למחקר קליני")
+# Page settings and logo
+st.set_page_config(page_title="TrialMatch Demo", page_icon="🔬")
+st.image("A_logo_for_a_company_named_TrialMatch_is_displayed.png", width=200)
+st.title("TrialMatch – התאמת מטופלים למחקרים קליניים באמצעות בינה מלאכותית")
 
-# Upload multiple medical documents
-uploaded_medical_files = st.file_uploader("העלאת מסמכים רפואיים (PDF)", type="pdf", accept_multiple_files=True)
+# Upload section
+protocol_file = st.file_uploader("📄 העלה את פרוטוקול המחקר (PDF)", type="pdf")
+medical_files = st.file_uploader("📁 העלה קבצי מידע רפואי של המטופל (PDF)", type="pdf", accept_multiple_files=True)
 
-# Upload trial protocol
-uploaded_protocol_file = st.file_uploader("העלאת פרוטוקול מחקר (PDF)", type="pdf")
+if protocol_file and medical_files:
+    with st.spinner("🔍 מבצע ניתוח והשוואה..."):
+        # Read protocol
+        protocol_reader = PdfReader(protocol_file)
+        protocol_text = "\n".join([page.extract_text() for page in protocol_reader.pages])
 
-# Function to extract text from PDFs
-def extract_text_from_pdf(file):
-    text = ""
-    with fitz.open(stream=file.read(), filetype="pdf") as doc:
-        for page in doc:
-            text += page.get_text()
-    return text
-
-# Process and display result
-if uploaded_medical_files and uploaded_protocol_file and st.button("בדוק התאמה"):
-    # Extract texts
-    medical_texts = [extract_text_from_pdf(file) for file in uploaded_medical_files]
-    combined_medical_text = "\n---\n".join(medical_texts)
-    protocol_text = extract_text_from_pdf(uploaded_protocol_file)
-
-    # Prepare prompt for GPT
-    prompt = f"""
-    אתה מערכת תומכת החלטה למחקרים קליניים. 
-    פרוטוקול מחקר:\n{protocol_text}\n
-    סיכום רפואי של המטופל:\n{combined_medical_text}\n
-    האם המטופל עומד בקריטריוני ההכללה והאי-הכללה? פרט והסבר אילו קריטריונים מתקיימים ואילו לא.
-    """
-
-    # Authenticate with OpenAI
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-    # Get completion
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    # Display result
-    st.subheader("תוצאת ההתאמה:")
-    st.write(response.choices[0].message.content)
+        # Step 1: Extract criteria
+        extraction_prompt = f"""
+        להלן טקסט מתוך פרוטוקול מחקר קליני. אתר רק את סעיפי הקריטריונים להכללה ואי-הכללה.
+        החזר את הטקסט שלהם בלבד בפורמט ברור:
+        ### קריטריוני הכללה:
+        ...
+        ### קריטריוני אי-הכללה:
+        ...
+        
+        פרוטוקול:
+        {protocol_text[:10000]}
